@@ -1,0 +1,20 @@
+#reference/
+.venv/
+dist/
+__pycache__/
+*.egg-info/
+board/frontend/node_modules/
+*.tsbuildinfo
+
+.fake
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+build/
+QUICK-GUIDE-MANU.md
+LINKEDIN-POST-MANU.md
+roadmap.md
+# the built board page (board/frontend: npm run build)
+teambuild/board/static/
