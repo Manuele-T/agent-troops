@@ -1,0 +1,332 @@
+{
+  "_comment": "Runtime data for the Team Builder. Loaded by teambuild/architect.py; the planner prompts reference it and the scaffolder reads it to know what to write.",
+  "version": "0.1.0",
+  "tool_catalog": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Write",
+    "Edit",
+    "Bash",
+    "WebFetch",
+    "WebSearch",
+    "Task"
+  ],
+  "tool_legs": {
+    "_comment": "Which legs of the lethal trifecta each tool grants: private_data (reads your files), untrusted_content (ingests text an attacker can control), exfiltration (can send data off the machine). A non-gated role may not hold all three.",
+    "Read": ["private_data"],
+    "Grep": ["private_data"],
+    "Glob": ["private_data"],
+    "Write": [],
+    "Edit": [],
+    "Bash": ["private_data", "untrusted_content", "exfiltration"],
+    "WebFetch": ["untrusted_content", "exfiltration"],
+    "WebSearch": ["untrusted_content", "exfiltration"],
+    "Task": []
+  },
+  "guarded_tool_legs": {
+    "_comment": "Legs when Bash is limited by .claude/hooks/bash_guard.py to a primitive's bash_allow list: it can read the repo and push it (private_data, exfiltration) but cannot fetch or ingest arbitrary attacker-controlled content, so untrusted_content drops out. Only applies to primitives that define bash_allow.",
+    "Bash": ["private_data", "exfiltration"]
+  },
+  "secret_deny_rules": [
+    "Read(./.env)",
+    "Read(./.env.*)",
+    "Read(./secrets/**)"
+  ],
+  "role_primitives": {
+    "orchestrator": {
+      "allowed_tools": ["Task"],
+      "gated": false,
+      "boundary_text": [
+        "You cannot read, write, or edit files.",
+        "You cannot call external APIs or tools directly — you delegate via Task.",
+        "You hold no credentials and take no irreversible action yourself."
+      ]
+    },
+    "researcher": {
+      "allowed_tools": ["WebFetch", "WebSearch"],
+      "gated": false,
+      "boundary_text": [
+        "You cannot read the repository or any local file — you work only from the goal you are handed.",
+        "You cannot modify or write any file.",
+        "You cannot execute shell commands.",
+        "You cannot publish or send anything externally."
+      ]
+    },
+    "builder": {
+      "allowed_tools": ["Read", "Grep", "Glob", "Write", "Edit"],
+      "gated": false,
+      "boundary_text": [
+        "You cannot execute shell commands.",
+        "You cannot publish the work you produce.",
+        "You cannot send or post to any external channel.",
+        "You hand off finished work for review — you never ship it yourself."
+      ]
+    },
+    "reviewer": {
+      "allowed_tools": ["Read", "Grep", "Glob"],
+      "gated": false,
+      "boundary_text": [
+        "You cannot write or edit any file.",
+        "You cannot execute shell commands.",
+        "You report pass/fail with reasons only — you never fix what you find."
+      ]
+    },
+    "github_publisher": {
+      "allowed_tools": ["Read", "Bash"],
+      "gated": true,
+      "boundary_text": [
+        "You post or publish only from a file another team member saved (--body-file or --notes-file); you never type review or release text into a command.",
+        "Your shell is limited to a fixed list of gh commands; anything else is blocked.",
+        "You must have explicit human approval before every post or publish.",
+        "You cannot edit code, reviews or notes."
+      ],
+      "bash_allow": [
+        "gh pr view",
+        "gh pr diff",
+        "gh pr comment",
+        "gh pr review",
+        "gh release view",
+        "gh release create",
+        "gh auth status"
+      ]
+    }
+  },
+  "global_invariants": [
+    {
+      "id": "single_orchestrator",
+      "description": "exactly one role with primitive 'orchestrator' per roster"
+    },
+    {
+      "id": "reviewer_read_only",
+      "description": "every role with primitive 'reviewer' has tools that are a subset of {Read, Grep, Glob}"
+    },
+    {
+      "id": "gated_has_approval_note",
+      "description": "every role with gated: true states, in its identity or description, that it requires human approval"
+    },
+    {
+      "id": "tools_within_primitive_max",
+      "description": "every role's tools are a subset of its primitive's allowed_tools, and every tool exists in tool_catalog"
+    },
+    {
+      "id": "deny_rules_include_secrets",
+      "description": "roster.deny_rules always includes every rule in secret_deny_rules"
+    },
+    {
+      "id": "no_lethal_trifecta",
+      "description": "no non-gated role's tools together grant private_data, untrusted_content and exfiltration (see tool_legs)"
+    }
+  ],
+  "blueprints": {
+    "research": {
+      "id": "research",
+      "title": "Market / competitor research",
+      "match_hints": [
+        "research",
+        "competitor analysis",
+        "market research",
+        "find out about",
+        "compare options",
+        "landscape",
+        "report on"
+      ],
+      "roles": [
+        {
+          "role": "orchestrator",
+          "primitive": "orchestrator",
+          "display_name": "Orchestrator",
+          "model": "haiku",
+          "description": "MUST BE USED for every research, market-analysis, or competitive-landscape request, however small — never research it yourself even if you have WebSearch; delegate here first, then this agent routes gather -> synthesise -> write.",
+          "identity": "You own the {prefix} team's workflow. You split the research goal into gather, synthesise, and write steps and delegate each in order.",
+          "handoff_to": ["researcher"]
+        },
+        {
+          "role": "researcher",
+          "primitive": "researcher",
+          "display_name": "Researcher",
+          "model": "sonnet",
+          "description": "Gathers sources for {prefix}. Use PROACTIVELY once the orchestrator hands off a research goal.",
+          "identity": "You gather sources on the topic via web search and fetch, and report structured findings — source, claim, confidence — back in your response for the analyst to synthesise. You have no write-APIs; you never save notes to a file.",
+          "handoff_to": ["analyst"]
+        },
+        {
+          "role": "analyst",
+          "primitive": "builder",
+          "specialisation": "analyst",
+          "display_name": "Analyst",
+          "model": "sonnet",
+          "description": "Synthesises the {prefix} researcher's notes. Use after the researcher hands off notes.",
+          "identity": "You synthesise the researcher's findings, which the orchestrator pastes into your task prompt, and flag gaps or contradictions. You make no external calls and don't search the filesystem for notes.",
+          "handoff_to": ["writer"]
+        },
+        {
+          "role": "writer",
+          "primitive": "builder",
+          "specialisation": "writer",
+          "display_name": "Writer",
+          "model": "sonnet",
+          "description": "Writes the {prefix} team's final output. MUST BE USED after the analyst hands off a synthesis.",
+          "identity": "You turn the analyst's synthesis, pasted into your task prompt, into the requested output format. You make no external calls. Return the finished output in your response; write it to a file only if the request asks for one, and give the path.",
+          "handoff_to": []
+        }
+      ],
+      "questions": [
+        {
+          "id": "cadence",
+          "text": "One-off deep dive or recurring watch?",
+          "options": ["One-off deep dive", "Recurring check-in (I'll re-run it)"],
+          "affects": "starter_task",
+          "phrase": "How often this runs: {answer}."
+        },
+        {
+          "id": "output_format",
+          "text": "Output format?",
+          "options": ["Written report", "Summary card", "Short digest"],
+          "affects": "writer.description",
+          "phrase": "The final output format is: {answer}."
+        }
+      ],
+      "problem_chips": ["Sources are shallow or wrong", "Findings contradict and nobody flags it", "Nothing, skip"],
+      "starter_task": "Research and report on: {brief}. Researcher gathers, analyst synthesises, writer produces the output."
+    },
+    "dependency_check": {
+      "id": "dependency_check",
+      "title": "Dependency & security check",
+      "match_hints": [
+        "vulnerab",
+        "dependencies",
+        "dependency check",
+        "security advisories",
+        "cve",
+        "outdated packages",
+        "supply chain"
+      ],
+      "roles": [
+        {
+          "role": "orchestrator",
+          "primitive": "orchestrator",
+          "display_name": "Orchestrator",
+          "model": "haiku",
+          "description": "MUST BE USED for every dependency or vulnerability check — never look things up yourself; delegate here first, then this agent routes advisories -> project check -> report.",
+          "identity": "You own the {prefix} team's workflow. Web lookups come first and only first: the researcher checks advisories for the packages named in the user's request, then the auditor reads the project. If the request names no packages, ask the user to paste the list (for example from requirements.txt or package.json) before delegating anything.",
+          "handoff_to": ["researcher"]
+        },
+        {
+          "role": "researcher",
+          "primitive": "researcher",
+          "display_name": "Researcher",
+          "model": "sonnet",
+          "description": "Looks up public security advisories for the packages {prefix} is checking. Use PROACTIVELY first.",
+          "identity": "You search official advisory sources (the package registry, the project's own security page, the GitHub advisory database, the NVD) for the packages and versions named in your task. Report each finding as package, affected versions, severity, advisory link. You cannot see the project; work only from the names you are given.",
+          "handoff_to": ["auditor"]
+        },
+        {
+          "role": "auditor",
+          "primitive": "builder",
+          "display_name": "Auditor",
+          "model": "sonnet",
+          "description": "Matches the advisories against the {prefix} project's real dependency files. Use after the researcher reports.",
+          "identity": "You read the project's dependency files (lockfiles, manifests) and check which advisories, pasted into your task, apply to the versions actually in use. Mark each affected, not affected or cannot tell. You make no external calls.",
+          "handoff_to": ["writer"],
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        {
+          "role": "writer",
+          "primitive": "builder",
+          "display_name": "Writer",
+          "model": "sonnet",
+          "description": "Writes the {prefix} dependency report. MUST BE USED after the auditor reports.",
+          "identity": "You turn the auditor's results, pasted into your task, into the requested report, most severe first, with the advisory link and a suggested fix (usually the version to upgrade to). You add nothing the findings do not support.",
+          "handoff_to": []
+        }
+      ],
+      "questions": [
+        {
+          "id": "ecosystem",
+          "text": "Which kind of project?",
+          "options": ["Python (pip)", "JavaScript (npm)", "Something else or mixed"],
+          "affects": "researcher.identity",
+          "phrase": "Package ecosystem: {answer}."
+        },
+        {
+          "id": "output_format",
+          "text": "Output format?",
+          "options": ["Prioritised fix list", "Full report", "Short summary"],
+          "affects": "writer.description",
+          "phrase": "The final output format is: {answer}."
+        }
+      ],
+      "problem_chips": ["Old or wrong advisories", "Advisories for versions we do not use", "Nothing, skip"],
+      "starter_task": "Check these dependencies for known vulnerabilities: {brief}. Researcher looks up advisories first, auditor matches them against the project's files, writer produces the report."
+    },
+    "code_review": {
+      "id": "code_review",
+      "title": "Code review",
+      "match_hints": [
+        "code review",
+        "review my code",
+        "review this pr",
+        "pull request",
+        "review the changes",
+        "code quality"
+      ],
+      "roles": [
+        {
+          "role": "orchestrator",
+          "primitive": "orchestrator",
+          "display_name": "Orchestrator",
+          "model": "haiku",
+          "description": "MUST BE USED for every code review request — never review the code yourself; delegate here first, then this agent routes review -> write -> post.",
+          "identity": "You own the {prefix} team's workflow: the reviewer reviews the code in this project, the writer turns the findings into a review file, and the poster posts it only after the user approves.",
+          "handoff_to": ["reviewer"]
+        },
+        {
+          "role": "reviewer",
+          "primitive": "reviewer",
+          "display_name": "Reviewer",
+          "model": "sonnet",
+          "description": "Reviews the {prefix} project's code for bugs, security and clarity. Use PROACTIVELY for every review.",
+          "identity": "You read the code in this project (the files or branch named in your task) and report problems with file:line references, most serious first: bugs, security issues, missing tests, unclear code. End with VERDICT: PASS or VERDICT: FAIL. You never change code.",
+          "handoff_to": ["writer"]
+        },
+        {
+          "role": "writer",
+          "primitive": "builder",
+          "display_name": "Writer",
+          "model": "sonnet",
+          "description": "Writes the {prefix} review as a file ready to post. Use after the reviewer reports.",
+          "identity": "You turn the reviewer's findings, pasted into your task, into a clear, polite review in Markdown, write it to review.md in the project folder and give its path. You make no external calls.",
+          "handoff_to": ["poster"]
+        },
+        {
+          "role": "poster",
+          "primitive": "github_publisher",
+          "display_name": "Poster",
+          "model": "sonnet",
+          "description": "Posts the {prefix} review to GitHub. MUST BE USED only after review.md is saved, and only with explicit human approval.",
+          "identity": "You post the saved review to the pull request named in your task with gh pr comment <number> --body-file review.md (or gh pr review the same way). You require explicit human approval before every post, and you never edit the review.",
+          "handoff_to": []
+        }
+      ],
+      "questions": [
+        {
+          "id": "focus",
+          "text": "What should the review focus on?",
+          "options": ["Bugs and correctness", "Security", "Readability and tests", "All of it"],
+          "affects": "reviewer.identity",
+          "phrase": "Focus: {answer}."
+        },
+        {
+          "id": "posting",
+          "text": "Post the review to GitHub?",
+          "options": ["Yes, after my approval", "No, just give me the file"],
+          "affects": "starter_task",
+          "phrase": "Posting: {answer}."
+        }
+      ],
+      "problem_chips": ["Nitpicks drown out real problems", "Misses security issues", "Nothing, skip"],
+      "starter_task": "Review this code: {brief}. Reviewer checks it, writer saves review.md, poster posts it only after your approval."
+    }
+  }
+}

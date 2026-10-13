@@ -1,0 +1,14 @@
+{
+  "name": "agent-troops",
+  "description": "Approvals on a local board for Claude Code's web calls and outward shell commands",
+  "owner": {
+    "name": "Manuele-T"
+  },
+  "plugins": [
+    {
+      "name": "agent-troops",
+      "source": "./plugin",
+      "description": "Every web fetch, web search and shell command that can reach the network waits for Allow or Deny on the agent-troops board, with leak warnings and an approval log"
+    }
+  ]
+}

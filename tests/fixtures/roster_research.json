@@ -1,0 +1,52 @@
+{
+  "team_prefix": "rs",
+  "blueprint_id": "research",
+  "roles": [
+    {
+      "id": "rs-orchestrator",
+      "primitive": "orchestrator",
+      "display_name": "Orchestrator",
+      "description": "Coordinates the rs research pipeline. Use PROACTIVELY to route every new research goal to the right agent.",
+      "model": "haiku",
+      "tools": ["Task"],
+      "gated": false,
+      "identity": "You own the rs team's workflow. You split the research goal into gather, synthesise, and write steps and delegate each in order.",
+      "handoff_to": ["rs-researcher"]
+    },
+    {
+      "id": "rs-researcher",
+      "primitive": "researcher",
+      "display_name": "Researcher",
+      "description": "Gathers sources for rs. Use PROACTIVELY once the orchestrator hands off a research goal.",
+      "model": "sonnet",
+      "tools": ["WebFetch", "WebSearch"],
+      "gated": false,
+      "identity": "You gather sources on the topic via web search and fetch, and write structured notes to the workspace. You have no write-APIs.",
+      "handoff_to": ["rs-analyst"]
+    },
+    {
+      "id": "rs-analyst",
+      "primitive": "builder",
+      "display_name": "Analyst",
+      "description": "Synthesises the rs researcher's notes. Use after the researcher hands off notes.",
+      "model": "sonnet",
+      "tools": ["Read", "Grep", "Glob", "Write", "Edit"],
+      "gated": false,
+      "identity": "You read the researcher's notes, synthesise findings, and flag gaps or contradictions. You make no external calls.",
+      "handoff_to": ["rs-writer"]
+    },
+    {
+      "id": "rs-writer",
+      "primitive": "builder",
+      "display_name": "Writer",
+      "description": "Writes the rs team's final output. MUST BE USED after the analyst hands off a synthesis.",
+      "model": "sonnet",
+      "tools": ["Read", "Grep", "Glob", "Write", "Edit"],
+      "gated": false,
+      "identity": "You turn the synthesis into the requested written report. You make no external calls.",
+      "handoff_to": []
+    }
+  ],
+  "deny_rules": ["Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"],
+  "guardrail": null
+}

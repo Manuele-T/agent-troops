@@ -1,0 +1,33 @@
+{
+  "name": "agent-troops",
+  "displayName": "agent-troops guard",
+  "version": "0.1.0",
+  "description": "Every web fetch, web search and shell command that can reach the network waits for Allow or Deny on the agent-troops board (http://127.0.0.1:8123), with leak warnings and an approval log. Without the board running, Claude Code asks as usual.",
+  "author": {
+    "name": "Manuele-T"
+  },
+  "repository": "https://github.com/Manuele-T/agent-troops",
+  "license": "MIT",
+  "keywords": ["security", "approvals", "prompt-injection", "audit"],
+  "userConfig": {
+    "sensitive_files": {
+      "type": "string",
+      "title": "Sensitive files",
+      "description": "Comma-separated file patterns, relative to the project (for example config/*,*.pem,customers/*). Once a session reads a matching file, its web calls and outward commands are refused or flagged. Empty: off.",
+      "default": ""
+    },
+    "after_sensitive": {
+      "type": "string",
+      "title": "After a sensitive file is read",
+      "description": "block: refuse anything leaving the computer for the rest of that session. ask: show it on the board with a red warning.",
+      "options": ["block", "ask"],
+      "default": "block"
+    },
+    "mcp_calls": {
+      "type": "boolean",
+      "title": "Ask for MCP tools too",
+      "description": "Send every MCP tool call to the board as well (the board cannot tell an MCP tool that reads from one that sends).",
+      "default": false
+    }
+  }
+}

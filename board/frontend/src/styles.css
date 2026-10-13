@@ -1,0 +1,610 @@
+:root {
+  --bg: #0f1117;
+  --floor: #161a23;
+  --card: #1d2230;
+  --card-border: #2b3242;
+  --text: #e6e9ef;
+  --muted: #8b94a7;
+  --idle: #4b5366;
+  --working: #3b82f6;
+  --done: #22c55e;
+  --blocked: #ef4444;
+  --approval: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.app {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  /* UI polish: global +20% scale. Every font-size in this file is a fixed px
+     value, not rem, so a root `html { font-size }` bump alone would cascade
+     to nothing — `zoom` is the one root-level lever that actually scales
+     every already-hardcoded px rule (fonts, padding, borders) together,
+     without touching each declaration. */
+  zoom: 1.2;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--card-border);
+}
+.topbar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+.conn { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.conn.live { background: rgba(34, 197, 94, 0.15); color: var(--done); }
+.conn.down { background: rgba(239, 68, 68, 0.15); color: var(--blocked); }
+.count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+.layout { display: flex; align-items: flex-start; }
+
+.room {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-content: flex-start;
+  margin: 16px;
+  padding: 44px 36px;
+  min-height: calc(100vh - 82px);
+  border: 14px solid #07080d;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.05), inset 0 0 60px rgba(0, 0, 0, 0.45);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0, rgba(255, 255, 255, 0.07) 1px, transparent 1px, transparent 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0, rgba(255, 255, 255, 0.07) 1px, transparent 1px, transparent 40px),
+    radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.08), transparent 60%),
+    #1a1f2c;
+  /* Step 13v2: now hosts a single PixiJS canvas (its own background.jpeg
+     covers this CSS background entirely) plus the empty-state overlay. */
+  position: relative;
+  overflow: hidden;
+}
+.room canvas { display: block; width: 100%; height: 100%; }
+.empty {
+  color: var(--muted);
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* uniform desks-in-a-row: fixed size, no per-card offset, same baseline */
+.character {
+  position: relative;
+  width: 150px;
+  height: 205px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 10px 20px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s, border-width 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.character:hover { transform: translateY(-3px); }
+.character.selected { border-color: var(--working); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35); }
+
+.avatar { position: relative; z-index: 1; display: block; line-height: 0; }
+.robot { display: block; }
+.rb-body { fill: var(--card-border); transition: fill 0.3s; }
+.rb-eye { fill: #05070b; }
+.rb-light { fill: var(--idle); transition: fill 0.3s; }
+
+/* desk: the robot sits behind it, so the desk overlaps the robot's feet */
+.desk-wrap { position: relative; z-index: 2; display: block; line-height: 0; margin-top: -14px; }
+.desk-svg { display: block; margin: 0 auto; }
+.desk-surface { fill: #1e3a5f; transition: filter 0.3s; }
+.desk-monitor { fill: #0d131b; stroke: #24384a; stroke-width: 0.2; }
+.desk-screen { fill: var(--idle); transition: fill 0.3s; }
+
+.name { position: relative; z-index: 1; font-size: 13px; font-weight: 600; }
+.state-label { position: relative; z-index: 1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+/* Step 13: independent (non-Kanban) session tag on the character card. */
+.independent-tag { position: relative; z-index: 1; font-size: 9px; color: var(--muted); font-style: italic; }
+
+.warn-badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--blocked);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 6px var(--blocked);
+  animation: warn-pulse 0.6s ease-in-out infinite;
+}
+
+/* Step 12: raised-hand / resolved-flash badge for a pending dangerous-command
+   approval. Opposite corner from .warn-badge so the two never collide. */
+.approval-badge {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+.approval-badge.approval-pending {
+  background: var(--approval);
+  box-shadow: 0 0 6px var(--approval);
+  animation: warn-pulse 0.8s ease-in-out infinite;
+}
+.approval-badge.approval-approved { background: var(--done); box-shadow: 0 0 6px var(--done); }
+.approval-badge.approval-denied { background: var(--blocked); box-shadow: 0 0 6px var(--blocked); }
+
+/* state-driven accents + animations — thicker, brighter border + glow per
+   state so the difference reads at a glance; idle stays deliberately flat */
+.character.state-working { border-color: var(--working); border-width: 2px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 22px rgba(59, 130, 246, 0.45); }
+.character.state-working .avatar { animation: bob 1.1s ease-in-out infinite; filter: drop-shadow(0 0 5px var(--working)); }
+.character.state-working .rb-body { fill: #2a3550; }
+.character.state-working .rb-light { fill: var(--working); animation: blink 1s steps(2, start) infinite; }
+.character.state-working .state-label { color: var(--working); }
+.character.state-working .desk-screen { fill: var(--working); filter: drop-shadow(0 0 3px var(--working)); }
+.character.state-working .desk-surface { filter: drop-shadow(0 0 4px var(--working)); }
+
+.character.state-done { border-color: var(--done); border-width: 2px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 22px rgba(34, 197, 94, 0.45); }
+.character.state-done .avatar { animation: pop 0.6s ease-out; filter: drop-shadow(0 0 6px var(--done)); }
+.character.state-done .rb-body { fill: #1e3a2a; }
+.character.state-done .rb-light { fill: var(--done); }
+.character.state-done .state-label { color: var(--done); }
+.character.state-done .desk-screen { fill: var(--done); filter: drop-shadow(0 0 3px var(--done)); }
+.character.state-done .desk-surface { filter: drop-shadow(0 0 4px var(--done)); }
+
+.character.state-blocked { border-color: var(--blocked); border-width: 2px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 22px rgba(239, 68, 68, 0.45); }
+.character.state-blocked .avatar { animation: shake 0.5s ease-in-out infinite; }
+.character.state-blocked .rb-body { fill: #3a2430; }
+.character.state-blocked .rb-light { fill: var(--blocked); animation: warn-pulse 0.6s ease-in-out infinite; }
+.character.state-blocked .state-label { color: var(--blocked); }
+.character.state-blocked .desk-screen { fill: var(--blocked); filter: drop-shadow(0 0 3px var(--blocked)); }
+.character.state-blocked .desk-surface { filter: drop-shadow(0 0 4px var(--blocked)); }
+
+.character.state-idle { opacity: 0.7; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+.character.state-idle .rb-light { fill: var(--idle); }
+.character.state-idle .desk-screen { fill: var(--idle); }
+.character.state-idle .desk-surface { filter: none; }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes blink { 0%, 40% { opacity: 1; } 50%, 90% { opacity: 0.25; } 100% { opacity: 1; } }
+@keyframes warn-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(1.3); } }
+
+/* assignment edge: agent -> current task. Floats below the fixed-height card
+   so a task chip never makes one card taller than its neighbours. */
+.edge { position: absolute; top: 100%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; margin-top: 8px; }
+.edge-line { width: 2px; height: 14px; background: var(--working); }
+.task-chip {
+  max-width: 110px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid var(--working);
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Step 11: delegated sub-agent sprite — a dashed, dimmer pill linked below the
+   parent's task chip (or on its own if no task chip is showing). Ephemeral:
+   only rendered while subagentVisible() says so. */
+.subagent-link { display: flex; flex-direction: column; align-items: center; margin-top: 8px; }
+.subagent-line { width: 2px; height: 10px; background: var(--muted); }
+.subagent-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 110px;
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: rgba(139, 148, 167, 0.12);
+  border: 1px dashed var(--muted);
+  color: var(--muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.subagent-link.subagent-active .subagent-line { background: var(--working); }
+.subagent-link.subagent-active .subagent-chip { border-color: var(--working); border-style: solid; color: var(--text); background: rgba(59, 130, 246, 0.12); }
+.subagent-link.subagent-active .subagent-dot { background: var(--working); animation: blink 1s steps(2, start) infinite; }
+.subagent-link.subagent-done .subagent-line { background: var(--done); }
+.subagent-link.subagent-done .subagent-chip { border-color: var(--done); border-style: solid; color: var(--text); background: rgba(34, 197, 94, 0.12); }
+.subagent-link.subagent-done .subagent-dot { background: var(--done); }
+
+.subagent-info { margin-top: 2px; }
+
+/* Approvals: outward calls held by .claude/hooks/board_gate.py until Allow or Deny is clicked. */
+.approvals {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--approval);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.08);
+}
+.approvals h2 { margin: 0 0 8px; font-size: 18px; color: var(--approval); }
+.approval-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--card-border);
+}
+.approval-body { grid-column: 1; min-width: 0; }
+.approval-what { margin: 0; font-size: 16px; }
+.approval-detail {
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.approval-buttons { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.approval-flagged { border-left: 4px solid var(--blocked); padding-left: 10px; }
+.approval-warnings { list-style: none; margin: 6px 0 0; padding-left: 0; color: var(--blocked); font-size: 14px; font-weight: 600; }
+.approval-buttons button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+.approval-buttons button:disabled { opacity: 0.4; cursor: not-allowed; }
+.approval-buttons .btn-approve { background: var(--done); }
+.approval-buttons .btn-danger { background: var(--blocked); }
+.approval-buttons .btn-approve-job { background: var(--working); }
+@media (max-width: 700px) {
+  .approval-card { grid-template-columns: 1fr; }
+  .approval-buttons { grid-column: 1; grid-row: auto; }
+}
+
+/* side panel */
+.panel {
+  width: 416px; /* 320px + 30% */
+  flex-shrink: 0;
+  padding: 18px;
+  background: #12151d;
+  border-left: 1px solid var(--card-border);
+  min-height: calc(100vh - 50px);
+  font-size: 1.3em; /* scope a ~30% text bump to the panel; children inherit via em */
+}
+.panel-empty { color: var(--muted); display: flex; align-items: center; justify-content: center; text-align: center; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; }
+.panel h2 { margin: 0; font-size: 21px; }
+.panel h3 { font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 18px 0 6px; }
+.close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+.panel .close { font-size: 29px; }
+.badge { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; font-size: 12px; text-transform: uppercase; }
+.panel .badge { font-size: 16px; }
+.badge.state-working { background: rgba(59, 130, 246, 0.15); color: var(--working); }
+.badge.state-done { background: rgba(34, 197, 94, 0.15); color: var(--done); }
+.badge.state-blocked { background: rgba(239, 68, 68, 0.15); color: var(--blocked); }
+.badge.state-idle { background: rgba(139, 148, 167, 0.15); color: var(--muted); }
+.muted { color: var(--muted); font-size: 12px; }
+.panel .muted { font-size: 16px; }
+.activity-label { margin-top: 2px; font-style: italic; }
+.task-current { font-size: 17px; }
+.actions { display: flex; flex-direction: column; gap: 8px; }
+.inp {
+  width: 100%;
+  padding: 7px 9px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  resize: vertical;
+}
+.actions button {
+  padding: 7px 10px;
+  background: var(--working);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.note-helper { margin: -4px 0 2px; font-size: 14px; line-height: 1.3; }
+.actions .btn-danger { background: var(--blocked); }
+.divider { border: none; border-top: 1px solid var(--card-border); margin: 4px 0; }
+.action-result { font-size: 12px; margin: 8px 0 0; }
+.panel .action-result { font-size: 16px; }
+.action-result.ok { color: var(--done); }
+.action-result.err { color: var(--blocked); }
+
+/* GUI polish: custom CSS tooltip for action buttons (data-tooltip attribute),
+   shown above the button on hover/focus — the browser's native title tooltip
+   is kept in parallel for accessibility, this one is the styled one users see. */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #05070b;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.events { list-style: none; padding: 0; margin: 0; }
+.events li { font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--card-border); }
+.panel .events li { font-size: 16px; }
+
+/* Prompt 3B: live worker-activity feed — bounded, scrollable, auto-scrolls to
+   the newest line (SidePanel.tsx). */
+.activity-subtitle { margin: -4px 0 8px; font-size: 14px; line-height: 1.3; }
+.activity-feed {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--card-border);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.activity-item-tool_call .activity-text,
+.activity-item-tool_result .activity-text {
+  color: var(--muted);
+  font-style: italic;
+}
+.activity-ts { flex-shrink: 0; font-size: 13px; }
+
+.ev-taskid-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--working);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ev-taskid-link:hover { color: var(--text); }
+
+/* task detail modal (click-through from Recent events) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 11, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  width: min(480px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 18px;
+  background: #12151d;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+/* Header stays visible while the body below scrolls (long .task-result /
+   .events.timeline content) — sticky within the modal's own scroll box. */
+.modal .panel-head {
+  position: sticky;
+  top: 0;
+  margin: -18px -18px 0;
+  padding: 18px 18px 8px;
+  background: #12151d;
+  z-index: 1;
+}
+.modal h2 { margin: 0; font-size: 15px; }
+.modal h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 16px 0 6px; }
+.task-result {
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 13px;
+  white-space: pre-wrap;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0;
+}
+.events.timeline li { display: flex; justify-content: space-between; gap: 10px; }
+.ev-kind { color: var(--text); font-weight: 600; }
+
+/* Board housekeeping panel — full-width section below the room/side-panel
+   layout. Row list reuses the .activity-feed bounded-scroll recipe so the
+   list scrolls the same way the other panels already do. */
+.housekeeping {
+  margin: 0 16px 16px;
+  padding: 18px;
+  background: #12151d;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+}
+.housekeeping-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.housekeeping-head h2 { margin: 0; font-size: 18px; }
+.housekeeping-head-controls { display: flex; align-items: center; gap: 14px; }
+.housekeeping-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.housekeeping-toggle input { cursor: pointer; }
+.housekeeping-head button {
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.housekeeping-head button.btn-danger { background: var(--blocked); }
+.housekeeping-head button:disabled { opacity: 0.4; cursor: not-allowed; }
+.housekeeping-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 6px 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+.housekeeping-row { padding: 10px 4px; border-bottom: 1px solid var(--card-border); }
+.housekeeping-row:last-child { border-bottom: none; }
+.housekeeping-main { display: flex; align-items: center; gap: 10px; }
+.housekeeping-id { font-size: 13px; color: var(--text); font-family: monospace; }
+.housekeeping-assignee { font-size: 13px; }
+.housekeeping-title { margin: 4px 0 0; font-size: 15px; }
+.housekeeping-summary { margin: 2px 0 8px; font-size: 13px; overflow-wrap: break-word; }
+.housekeeping-archived-tag { font-style: italic; }
+.housekeeping-row button {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.housekeeping-row button.btn-danger { background: var(--blocked); }
+.housekeeping-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.activity-item-blocked .activity-text {
+  color: #ff8a8a;
+  font-weight: 600;
+}
+.boundaries { margin: 8px 0 4px; }
+.boundaries h3 { margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+.boundary-legs { list-style: none; margin: 0; padding: 0; }
+.boundary-legs li { display: flex; align-items: baseline; gap: 8px; font-size: 15px; padding: 2px 0; }
+.leg-free { opacity: 0.6; }
+.leg-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 5px; font-size: 12px; font-weight: 700; color: #111;
+  flex-shrink: 0;
+}
+.leg-free .leg-chip { background: transparent !important; border: 1px solid currentColor; color: inherit; }
+.leg-P { background: #5b9dff; }
+.leg-U { background: #ffb04a; }
+.leg-E { background: #ff5a5a; }
+.boundary-tools { font-size: 14px; margin: 6px 0 0; }
+.boundary-warn { font-size: 14px; color: #ffb04a; margin: 4px 0 0; }
+
+/* Results: the job, the team's final answer and each member's report, as readable text. */
+.results {
+  margin-top: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(139, 148, 167, 0.06);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.results-empty { text-align: center; }
+.results h2 { font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 0 0 6px; }
+.results-job { margin-bottom: 14px; }
+.results-job p { margin: 0; white-space: pre-wrap; }
+.results-final { margin-bottom: 14px; }
+.results-reports details { border-top: 1px solid var(--card-border); padding: 8px 0; }
+.results-reports summary { cursor: pointer; font-size: 15px; }
+.asked { white-space: pre-wrap; font-size: 15px; margin: 0; max-height: 220px; overflow: auto; }
+.report { font-size: 15px; max-height: 420px; overflow: auto; }
+
+.md-h { margin: 12px 0 4px; font-size: 17px; }
+.md-p { margin: 6px 0; }
+.md-list { margin: 6px 0; padding-left: 22px; }
+.md-pre { white-space: pre-wrap; background: rgba(0, 0, 0, 0.25); padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+.md code { background: rgba(0, 0, 0, 0.25); padding: 1px 4px; border-radius: 4px; font-size: 0.9em; }
+.md-table-wrap { overflow-x: auto; margin: 8px 0; }
+.md-table { border-collapse: collapse; font-size: 15px; }
+.md-table th, .md-table td { border: 1px solid var(--card-border); padding: 5px 10px; text-align: left; vertical-align: top; }
+.md-table th { background: rgba(139, 148, 167, 0.12); }
+
+.results-decisions { border-top: 1px solid var(--card-border); padding-top: 8px; margin-top: 8px; text-align: left; }
+.results-decisions summary { cursor: pointer; font-size: 15px; }
+.decision-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+.decision-list li { padding: 3px 0; word-break: break-all; }
+.decision-mark { display: inline-block; width: 18px; font-weight: 700; }
+.decision-allow .decision-mark { color: var(--done); }
+.decision-deny .decision-mark { color: var(--blocked); }
+.decision-warn { color: var(--blocked); font-weight: 600; }

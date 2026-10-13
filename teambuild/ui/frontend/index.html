@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="tb-token" content="__TB_TOKEN__">
+<title>Team Builder</title>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to the page content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="header-row">
+      <h1 class="brand">Team Builder</h1>
+      <div class="header-actions">
+        <button type="button" id="theme-toggle" class="theme-toggle">Theme</button>
+        <div id="board-slot" class="board-slot"></div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#guard" data-tab="guard">Guard</a>
+      <a href="#create" data-tab="create">Teams</a>
+      <a href="#audit" data-tab="audit">Audit</a>
+      <a href="#run" data-tab="run">Run</a>
+      <a href="#settings" data-tab="settings">Settings</a>
+    </nav>
+    <p id="board-hint" class="hint board-hint" hidden>The board is not running: start it with <code>team-build board</code> to answer approvals</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <div id="page-error" class="alert alert-error" role="alert" hidden></div>
+
+  <section id="view-guard" class="view" data-view="guard" hidden>
+    <h2 tabindex="-1">Guard mode</h2>
+    <div id="guard-body"></div>
+  </section>
+
+  <section id="view-create" class="view" data-view="create" hidden>
+    <h2 tabindex="-1">Create a team (optional)</h2>
+    <div id="create-body"><p class="muted">Loading the team list...</p></div>
+  </section>
+
+  <section id="view-audit" class="view" data-view="audit" hidden>
+    <h2 tabindex="-1">Audit a folder</h2>
+    <div id="audit-body"></div>
+  </section>
+
+  <section id="view-run" class="view" data-view="run" hidden>
+    <h2 tabindex="-1">Run a team</h2>
+    <div id="run-body"></div>
+  </section>
+
+  <section id="view-settings" class="view" data-view="settings" hidden>
+    <h2 tabindex="-1">Settings</h2>
+    <div id="settings-body"><p class="muted">Loading your settings...</p></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Works with the Claude Code already installed on this computer, with your own login: guard mode only adds hooks, and runs count against your own plan's usage limits. Everything stays on this computer.</p>
+  </div>
+</footer>
+
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
+<noscript><p class="wrap">This page needs JavaScript to work.</p></noscript>
+</body>
+</html>

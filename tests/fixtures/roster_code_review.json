@@ -1,0 +1,77 @@
+{
+  "team_prefix": "cr",
+  "blueprint_id": "code_review",
+  "roles": [
+    {
+      "id": "cr-orchestrator",
+      "primitive": "orchestrator",
+      "display_name": "Orchestrator",
+      "description": "MUST BE USED for every code review request \u2014 never review the code yourself; delegate here first, then this agent routes review -> write -> post.",
+      "model": "haiku",
+      "tools": [
+        "Task"
+      ],
+      "gated": false,
+      "identity": "You own the cr team's workflow: the reviewer reviews the code in this project, the writer turns the findings into a review file, and the poster posts it only after the user approves.",
+      "handoff_to": [
+        "cr-reviewer"
+      ]
+    },
+    {
+      "id": "cr-reviewer",
+      "primitive": "reviewer",
+      "display_name": "Reviewer",
+      "description": "Reviews the cr project's code for bugs, security and clarity. Use PROACTIVELY for every review.",
+      "model": "sonnet",
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob"
+      ],
+      "gated": false,
+      "identity": "You read the code in this project (the files or branch named in your task) and report problems with file:line references, most serious first: bugs, security issues, missing tests, unclear code. End with VERDICT: PASS or VERDICT: FAIL. You never change code. Focus: All of it.",
+      "handoff_to": [
+        "cr-writer"
+      ]
+    },
+    {
+      "id": "cr-writer",
+      "primitive": "builder",
+      "display_name": "Writer",
+      "description": "Writes the cr review as a file ready to post. Use after the reviewer reports.",
+      "model": "sonnet",
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Write",
+        "Edit"
+      ],
+      "gated": false,
+      "identity": "You turn the reviewer's findings, pasted into your task, into a clear, polite review in Markdown, write it to review.md in the project folder and give its path. You make no external calls.",
+      "handoff_to": [
+        "cr-poster"
+      ]
+    },
+    {
+      "id": "cr-poster",
+      "primitive": "github_publisher",
+      "display_name": "Poster",
+      "description": "Posts the cr review to GitHub. MUST BE USED only after review.md is saved, and only with explicit human approval.",
+      "model": "sonnet",
+      "tools": [
+        "Read",
+        "Bash"
+      ],
+      "gated": true,
+      "identity": "You post the saved review to the pull request named in your task with gh pr comment <number> --body-file review.md (or gh pr review the same way). You require explicit human approval before every post, and you never edit the review.",
+      "handoff_to": []
+    }
+  ],
+  "deny_rules": [
+    "Read(./.env)",
+    "Read(./.env.*)",
+    "Read(./secrets/**)"
+  ],
+  "guardrail": null
+}

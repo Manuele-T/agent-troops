@@ -1,0 +1,9 @@
+# pre-commit (https://pre-commit.com) hook: audit the Claude Code setup before each commit that touches it.
+- id: agent-troops-audit
+  name: agent-troops audit (Claude Code agents, hooks, MCP servers, skills)
+  description: Fails the commit when an agent, hook, MCP server or skill matches a known attack pattern
+  entry: team-build --audit
+  args: [--fail-on, fail]
+  language: python
+  pass_filenames: false
+  files: ^(\.claude/|\.mcp\.json$)

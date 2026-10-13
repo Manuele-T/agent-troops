@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/emit.py\""}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/emit.py\""}]},
+      {"matcher": "WebFetch|WebSearch|Bash|Read|Grep|mcp__.*", "hooks": [
+        {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/board_gate.py\" --plugin-options", "timeout": 600}
+      ]}
+    ],
+    "PostToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/emit.py\""}]}
+    ],
+    "SubagentStop": [
+      {"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/emit.py\""}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/emit.py\""}]}
+    ]
+  }
+}

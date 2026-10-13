@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-troops"
+version = "0.1.0"
+description = "A maker-checker for Claude Code: outward calls wait for approval on a local board; audit agents, hooks and MCP servers; least-privilege agent teams"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Manuele-T" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+]
+
+requires-python = ">=3.11"
+dependencies = [
+    "python-dotenv",
+]
+[project.urls]
+Homepage = "https://github.com/Manuele-T/agent-troops"
+
+[project.optional-dependencies]
+# `team-build ui` and `team-build board`. Pinned to the versions the tests ran against.
+ui = [
+    "fastapi==0.141.1",
+    "uvicorn==0.52.3",
+]
+
+[project.scripts]
+team-build = "teambuild.cli:main"
+
+[tool.setuptools]
+packages = ["teambuild", "teambuild.templates", "teambuild.ui", "teambuild.board"]
+
+[tool.setuptools.package-data]
+teambuild = ["blueprints.json", "templates/*.py"]
+"teambuild.ui" = ["frontend/*"]
+# The built board page (npm run build in board/frontend writes it here; the release workflow builds it).
+"teambuild.board" = ["static/*", "static/**/*"]
